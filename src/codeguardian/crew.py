@@ -1,64 +1,81 @@
-from crewai import Agent, Crew, Process, Task
-from crewai.project import CrewBase, agent, crew, task
-from crewai.agents.agent_builder.base_agent import BaseAgent
+import os
 from typing import List
-# If you want to run a snippet of code before or after the crew starts,
-# you can use the @before_kickoff and @after_kickoff decorators
-# https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
+
+from dotenv import load_dotenv
+from crewai import Crew, Process, Task, LLM
+from crewai.project import CrewBase, crew
+from crewai.agents.agent_builder.base_agent import BaseAgent
+
+from .agents import (
+    build_senior_software_engineer,
+    build_test_automation_expert,
+    build_devops_expert,
+)
+
+from .tasks import (
+    build_triage_and_fix_task,
+    build_playwright_regression_task,
+    build_build_deploy_runbook_task,
+)
+
+load_dotenv(override=True)
+
+
+def _llm() -> LLM:
+    openai_api_key = os.getenv("OPENAI_API_KEY", "test")
+    model = os.getenv("MODEL", "openai/kaitchup/Llama-3.3-70B-Instruct-AutoRound-GPTQ-4bit")
+    api_base = os.getenv("API_BASE", "http://bmf-ai.apps.ce.capgemini.com/chat/v1")
+
+    return LLM(
+        model=model,
+        base_url=api_base,
+        api_key=openai_api_key,
+    )
+
 
 @CrewBase
-class Codeguardian():
-    """Codeguardian crew"""
+class Codeguardian:
+    """Codeguardian crew (best practice, code-first, no YAML)"""
 
     agents: List[BaseAgent]
     tasks: List[Task]
 
-    # Learn more about YAML configuration files here:
-    # Agents: https://docs.crewai.com/concepts/agents#yaml-configuration-recommended
-    # Tasks: https://docs.crewai.com/concepts/tasks#yaml-configuration-recommended
-    
-    # If you would like to add tools to your agents, you can learn more about it here:
-    # https://docs.crewai.com/concepts/agents#agent-tools
-    @agent
-    def researcher(self) -> Agent:
-        return Agent(
-            config=self.agents_config['researcher'], # type: ignore[index]
-            verbose=True
-        )
-
-    @agent
-    def reporting_analyst(self) -> Agent:
-        return Agent(
-            config=self.agents_config['reporting_analyst'], # type: ignore[index]
-            verbose=True
-        )
-
-    # To learn more about structured task outputs,
-    # task dependencies, and task callbacks, check out the documentation:
-    # https://docs.crewai.com/concepts/tasks#overview-of-a-task
-    @task
-    def research_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['research_task'], # type: ignore[index]
-        )
-
-    @task
-    def reporting_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['reporting_task'], # type: ignore[index]
-            output_file='report.md'
-        )
-
     @crew
     def crew(self) -> Crew:
-        """Creates the Codeguardian crew"""
-        # To learn how to add knowledge sources to your crew, check out the documentation:
-        # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
+        llm = _llm()
+
+        issue_text = os.getenv("ISSUE_TEXT", "Bug: API returns 500 when payload field 'x' is missing.")
+        app_context = os.getenv("APP_CONTEXT", "Backend: Spring Boot; UI: Web; E2E: Playwright; Deploy: Docker/K8s.")
+        constraints = os.getenv("CONSTRAINTS", "- Minimal diff\n- Backward compatible\n- Add regression tests\n")
+
+        senior_software_engineer = build_senior_software_engineer(llm)
+        test_automation_expert = build_test_automation_expert(llm)
+        devops_expert = build_devops_expert(llm)
+
+        t1 = build_triage_and_fix_task(
+            agent=senior_software_engineer,
+            issue_text=issue_text,
+            app_context=app_context,
+            constraints=constraints,
+        )
+
+        t2 = build_playwright_regression_task(
+            agent=test_automation_expert,
+            issue_text=issue_text,
+            triage_summary="",
+            app_context=app_context,
+        )
+
+        t3 = build_build_deploy_runbook_task(
+            agent=devops_expert,
+            issue_text=issue_text,
+            test_plan="",
+            app_context=app_context,
+        )
 
         return Crew(
-            agents=self.agents, # Automatically created by the @agent decorator
-            tasks=self.tasks, # Automatically created by the @task decorator
+            agents=[senior_software_engineer, test_automation_expert, devops_expert],
+            tasks=[t1, t2, t3],
             process=Process.sequential,
             verbose=True,
-            # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
         )
