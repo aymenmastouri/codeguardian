@@ -1,127 +1,88 @@
 from crewai import Task
 from crewai import Agent
 
-
-def build_triage_and_fix_task(
-        agent: Agent,
-        issue_text: str,
-        app_context: str = "",
-        constraints: str = "",
-) -> Task:
+def analysis_and_design_task(agent: Agent) -> Task:
     return Task(
-        description=f"""
-You are a Senior Software Engineer (Cloud-Native & Distributed Systems).
+        description="""
+You are the Senior Software Architect.
 
-Analyze the reported issue and propose a minimal, safe fix.
-Focus on production-grade thinking: backward compatibility, resilience, and minimal blast radius.
+MANDATORY ORDER:
+1) Read .gitignore first (FileReadTool) and treat ignored paths as non-existent.
+2) Read bug-desc.txt and bug-log.txt (FileReadTool).
+3) Use DirectorySearchTool to find the most relevant code/config files based on:
+   - exception names
+   - stack traces
+   - endpoint paths
+   - logger/class/package names
+4) Only after search: read a SMALL number of top files (max 10) using FileReadTool.
 
-Issue:
-{issue_text}
+Deliver:
+- CHANGE PLAN (human readable)
+- PATCH PLAN JSON (between markers)
 
-Context:
-{app_context}
+PATCH PLAN JSON RULES (MANDATORY):
+- PATCH PLAN MUST be valid JSON and enclosed by the markers.
+- IMPORTANT: All target file paths MUST be RELATIVE to PROJECT_PATH.
+  Example:
+    "src/main/java/.../BuggyService.java"
+  NOT:
+    "C:\\project-backend\\src\\main\\java\\...\\BuggyService.java"
+- Do NOT include absolute paths, drive letters, or PROJECT_PATH prefix.
+- Use forward slashes (/) in JSON paths.
 
-Constraints:
-{constraints}
+---PATCH_PLAN_JSON_START---
+{ ... }
+---PATCH_PLAN_JSON_END---
 
-Deliverables:
-1) Root cause hypotheses (ranked)
-2) Minimal fix strategy (step-by-step)
-3) Concrete code-change guidance (modules/files/classes you would touch)
-4) Distributed-systems risks (timeouts/retries/idempotency/concurrency)
-5) Observability notes (logs/metrics/traces) to confirm the fix in production
+
+Rules:
+- Do NOT implement anything
+- Do NOT write files
 """,
-        expected_output="""
-A structured triage report with:
-- ranked root cause hypotheses
-- minimal fix plan
-- concrete code change guidance
-- risk analysis (distributed systems)
-- observability recommendations
-""",
+        expected_output="Change plan + Patch plan JSON with exact target files and precise instructions.",
         agent=agent,
     )
 
-
-def build_playwright_regression_task(
-        agent: Agent,
-        issue_text: str,
-        triage_summary: str = "",
-        app_context: str = "",
-) -> Task:
+def implementation_task(agent: Agent) -> Task:
     return Task(
-        description=f"""
-You are a Test Automation Expert (Playwright).
+        description="""
+You are the Senior Software Engineer (Implementation).
 
-Design a Playwright regression test approach that validates the fix and prevents future regressions.
-Focus on stability and CI reliability (anti-flakiness, deterministic test data, robust locators).
+CONTEXT RULE (MANDATORY):
+- The Architect's output (including PATCH_PLAN_JSON) is provided as TASK CONTEXT.
+- PATCH_PLAN_JSON is NOT a file.
+- DO NOT attempt to read "PATCH_PLAN_JSON" via FileReadTool or any filesystem path.
+- Extract the JSON only from the context markers:
+  ---PATCH_PLAN_JSON_START---
+  ...json...
+  ---PATCH_PLAN_JSON_END---
 
-Issue:
-{issue_text}
+MANDATORY FILE SELECTION (STRICT):
+- For EACH entry in PATCH PLAN JSON target_files[]:
+  1) Build absolute path = PROJECT_PATH + "/" + target_files[].path
+  2) Read THAT file using FileReadTool
+  3) Implement the listed changes in THAT file using FileWriterTool (minimal diff)
+- DO NOT use local_directory_rag_search to find target files from the plan.
 
-Triage summary:
-{triage_summary}
+WHEN RAG IS ALLOWED:
+- Use local_directory_rag_search ONLY to find additional dependency/config files AFTER reading the target files.
+- If using RAG, apply these filters:
+  - IGNORE src/test/**
+  - IGNORE *Test.java
+  - Prefer src/main/java/** and src/main/resources/**
 
-Context:
-{app_context}
+OTHER RULES:
+- Respect .gitignore strictly.
+- Only modify files under PROJECT_PATH.
+- Backward compatible changes only.
+- Add/adjust tests only if required by acceptance criteria.
 
-Deliverables:
-1) Test strategy (scope and coverage)
-2) Given/When/Then test cases
-3) Implementation guidance (locators, waits, retries, assertions)
-4) Flakiness prevention checklist
-5) Suggested test structure (file names, folders)
+Output:
+IMPLEMENTATION SUMMARY
+- Changed files (relative paths) + per-file summary
+- Verification steps
+- Deviations (if any)
 """,
-        expected_output="""
-A Playwright E2E regression plan including:
-- strategy and coverage
-- test cases (Given/When/Then)
-- implementation guidelines (locators/waits/retries)
-- flakiness prevention checklist
-- suggested file/folder layout
-""",
-        agent=agent,
-    )
-
-
-def build_build_deploy_runbook_task(
-        agent: Agent,
-        issue_text: str,
-        test_plan: str = "",
-        app_context: str = "",
-) -> Task:
-    return Task(
-        description=f"""
-You are a DevOps Expert (Build, Deploy & Runtime).
-
-Create a reproducible runbook to build, test, deploy and start the application.
-Assume developers need copy/paste commands and clear environment variables.
-Focus on reliability, fast feedback, and troubleshooting.
-
-Issue:
-{issue_text}
-
-Playwright test plan:
-{test_plan}
-
-Context:
-{app_context}
-
-Deliverables:
-1) Local build commands (Maven/Gradle variants)
-2) Local run/start instructions (Spring Boot and containerized options)
-3) Playwright execution steps (how to run E2E in CI and locally)
-4) CI/CD pipeline outline (stages, caching hints)
-5) Deploy outline (Docker/K8s/Helm - minimal steps)
-6) Troubleshooting section (common failures + quick checks)
-""",
-        expected_output="""
-A practical runbook with:
-- exact build/test/run commands
-- required env vars
-- CI/CD outline
-- deploy outline
-- troubleshooting checklist
-""",
+        expected_output="Implementation summary with changed files and verification steps.",
         agent=agent,
     )

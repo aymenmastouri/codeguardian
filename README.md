@@ -1,54 +1,196 @@
-# Codeguardian Crew
+# CodeGuardian
 
-Welcome to the Codeguardian Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+**CodeGuardian** is a code-first, on-premise AI crew built with **CrewAI**.
+It analyzes bugs, searches large repositories efficiently using **local RAG**, and **implements fixes directly in the target project** — without relying on cloud services.
+
+The system is designed to scale to **large repositories (10k+ files)** and behaves similarly to the **Continue IDE plugin**:
+- indexing is explicit
+- re-indexing happens **only when necessary**
+- no hidden side effects
+
+---
+
+## Key Principles
+
+- ✅ On-prem only (LLM + embeddings)
+- ✅ Code-first (no YAML configs)
+- ✅ Separation of concerns
+- ✅ Incremental & smart indexing
+- ✅ Git-aware change detection
+- ✅ Minimal context passed between agents
+
+---
+
+## Architecture Overview
+
+### Agents
+
+**Senior Software Architect**
+- Reads bug description & logs
+- Respects `.gitignore` from the target repository
+- Uses semantic RAG search
+- Produces a structured Change Plan
+
+**Senior Software Engineer**
+- Consumes the Change Plan via task context
+- Locates exact files
+- Implements fixes directly in the target repo
+- Writes minimal diffs only
+
+---
+
+## Repository Structure
+
+```
+codeguardian/
+├─ src/codeguardian/
+│  ├─ agents.py
+│  ├─ tasks.py
+│  ├─ crew.py
+│  ├─ index.py              # explicit indexing command
+│  └─ tools/
+│     ├─ tools.py           # tool wiring & index logic
+│     └─ local_rag_tool.py  # Ollama + Chroma RAG tool
+├─ content/.chroma/         # persistent vector index
+├─ pyproject.toml
+└─ README.md
+```
+
+---
+
+## Target Project vs CodeGuardian Repo
+
+| Purpose | Path |
+|------|-----|
+| CodeGuardian repo | anywhere |
+| Target project to analyze/fix | PROJECT_PATH |
+| Bug input files | INPUTS_PATH |
+| Vector index | CHROMA_DIR |
+
+`.gitignore` is always read from the **target project**, never from CodeGuardian.
+
+---
+
+## Requirements
+
+- Python 3.10+
+- uv
+- Git
+- Ollama (for embeddings)
+- On-prem OpenAI-compatible LLM endpoint
+
+---
 
 ## Installation
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
-
-First, if you haven't already, install uv:
-
-```bash
-pip install uv
+```
+uv sync
 ```
 
-Next, navigate to your project directory and install the dependencies:
+---
 
-(Optional) Lock the dependencies and install them by using the CLI command:
-```bash
-crewai install
+## Environment Variables
+
 ```
-### Customizing
+PROJECT_PATH=C:\project-backend
+INPUTS_PATH=C:\inputs
+BUG_DESC_FILE=bug-desc.txt
+BUG_LOG_FILE=bug-log.txt
 
-**Add your `OPENAI_API_KEY` into the `.env` file**
+CHROMA_DIR=C:\projects\codeguardian\.cache\.chroma
 
-- Modify `src/codeguardian/config/agents.yaml` to define your agents
-- Modify `src/codeguardian/config/tasks.yaml` to define your tasks
-- Modify `src/codeguardian/crew.py` to add your own logic, tools and specific args
-- Modify `src/codeguardian/main.py` to add custom inputs for your agents and tasks
+OLLAMA_BASE_URL=http://localhost:11434
+EMBED_MODEL=nomic-embed-text:latest
 
-## Running the Project
-
-To kickstart your crew of AI agents and begin task execution, run this from the root folder of your project:
-
-```bash
-$ crewai run
+FORCE_REINDEX=0
+AUTO_INDEX_NO_GIT=0
+INDEX_MAX_FILES_BACKEND=4000
+INDEX_MAX_FILES_FRONTEND=4000
 ```
 
-This command initializes the CodeGuardian Crew, assembling the agents and assigning them tasks as defined in your configuration.
+---
 
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
+## Indexing Model (Continue-like)
 
-## Understanding Your Crew
+Indexing is explicit and controlled.
 
-The CodeGuardian Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
+### First-time Indexing
 
-## Support
+```
+uv run python -m codeguardian.index
+```
 
-For support, questions, or feedback regarding the Codeguardian Crew or crewAI.
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
+### Normal Execution
 
-Let's create wonders together with the power and simplicity of crewAI.
+```
+crewai run
+```
+
+Re-indexing happens only if:
+- Git HEAD changed and relevant files were modified
+- Uncommitted relevant changes exist
+- Index configuration changed
+- FORCE_REINDEX=1
+
+---
+
+## Git-Aware Change Detection
+
+- git diff old..new
+- git status --porcelain
+
+Only relevant file changes trigger re-indexing.
+
+---
+
+## Task & Context Flow
+
+1. Architect Task:
+    - Reads bug files and .gitignore
+    - Uses RAG search
+    - Outputs Change Plan
+
+2. Engineer Task:
+    - Receives Change Plan via task.context
+    - Implements fix directly
+
+No intermediate files. No duplicated context.
+
+---
+
+## Why No YAML?
+
+- Full control in Python
+- Static typing
+- Debuggable
+- No magic defaults
+
+---
+
+## Typical Workflow
+
+```
+uv run python -m codeguardian.index
+crewai run
+```
+
+---
+
+## Guarantees
+
+- No cloud calls
+- No OpenAI embeddings
+- No Qdrant
+- Fully local RAG
+- Deterministic behavior
+- Scales to large repos
+
+---
+
+## Summary
+
+CodeGuardian behaves like a professional on-prem AI engineer:
+- indexes only when needed
+- respects git and .gitignore
+- scales cleanly
+- modifies code responsibly
