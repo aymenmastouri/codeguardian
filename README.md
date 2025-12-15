@@ -1,23 +1,24 @@
 # CodeGuardian
 
-**CodeGuardian** is a code-first, on-premise AI crew built with **CrewAI**.
+**CodeGuardian** is a **code-first, on‑prem AI engineering crew** built with **CrewAI**.
 It analyzes bugs, searches large repositories efficiently using **local RAG**, and **implements fixes directly in the target project** — without relying on cloud services.
 
 The system is designed to scale to **large repositories (10k+ files)** and behaves similarly to the **Continue IDE plugin**:
-- indexing is explicit
-- re-indexing happens **only when necessary**
-- no hidden side effects
+
+* explicit indexing
+* re-indexing **only when necessary**
+* no hidden side effects
 
 ---
 
 ## Key Principles
 
-- ✅ On-prem only (LLM + embeddings)
-- ✅ Code-first (no YAML configs)
-- ✅ Separation of concerns
-- ✅ Incremental & smart indexing
-- ✅ Git-aware change detection
-- ✅ Minimal context passed between agents
+* ✅ Fully on‑prem (LLM + embeddings)
+* ✅ Code‑first (no YAML configs)
+* ✅ Explicit & incremental indexing
+* ✅ Git‑aware change detection
+* ✅ Minimal context passed between agents
+* ✅ Deterministic behavior
 
 ---
 
@@ -26,16 +27,18 @@ The system is designed to scale to **large repositories (10k+ files)** and behav
 ### Agents
 
 **Senior Software Architect**
-- Reads bug description & logs
-- Respects `.gitignore` from the target repository
-- Uses semantic RAG search
-- Produces a structured Change Plan
+
+* Reads bug description & logs
+* Respects `.gitignore` from the **target project**
+* Uses semantic RAG search (local)
+* Produces a structured **Change Plan**
 
 **Senior Software Engineer**
-- Consumes the Change Plan via task context
-- Locates exact files
-- Implements fixes directly in the target repo
-- Writes minimal diffs only
+
+* Consumes the Change Plan via task context
+* Locates exact files
+* Implements fixes **directly in the target repo**
+* Writes **minimal diffs only**
 
 ---
 
@@ -60,137 +63,172 @@ codeguardian/
 
 ## Target Project vs CodeGuardian Repo
 
-| Purpose | Path |
-|------|-----|
-| CodeGuardian repo | anywhere |
-| Target project to analyze/fix | PROJECT_PATH |
-| Bug input files | INPUTS_PATH |
-| Vector index | CHROMA_DIR |
+| Purpose                       | Path           |
+| ----------------------------- | -------------- |
+| CodeGuardian repo             | anywhere       |
+| Target project to analyze/fix | `PROJECT_PATH` |
+| Bug input files               | `INPUTS_PATH`  |
+| Vector index                  | `CHROMA_DIR`   |
 
-`.gitignore` is always read from the **target project**, never from CodeGuardian.
+> `.gitignore` is **always read from the target project**, never from CodeGuardian.
 
 ---
 
 ## Requirements
 
-- Python 3.10+
-- uv
-- Git
-- Ollama (for embeddings)
-- On-prem OpenAI-compatible LLM endpoint
+* Python **3.10+**
+* **uv**
+* Git
+* **Ollama** (for embeddings)
+* On‑prem **OpenAI‑compatible LLM endpoint**
 
 ---
 
 ## Installation
 
-```
+```bash
 uv sync
 ```
+
+This creates a local `.venv` automatically.
+
+---
+
+## Virtual Environment (Windows + Git Bash)
+
+### Activate `.venv`
+
+```bash
+source .venv/Scripts/activate
+```
+
+You should see:
+
+```
+(.venv) username@machine
+```
+
+### Deactivate
+
+```bash
+deactivate
+```
+
+> **Recommended:** even with `.venv`, prefer `uv run` for deterministic execution.
 
 ---
 
 ## Environment Variables
 
-```
-PROJECT_PATH=C:\project-backend
-INPUTS_PATH=C:\inputs
-BUG_DESC_FILE=bug-desc.txt
-BUG_LOG_FILE=bug-log.txt
+```bash
+export PROJECT_PATH="/c/project-backend"
+export INPUTS_PATH="/c/inputs"
+export BUG_DESC_FILE="bug-desc.txt"
+export BUG_LOG_FILE="bug-log.txt"
 
-CHROMA_DIR=C:\projects\codeguardian\.cache\.chroma
+export CHROMA_DIR="/c/projects/codeguardian/.cache/.chroma"
 
-OLLAMA_BASE_URL=http://localhost:11434
-EMBED_MODEL=nomic-embed-text:latest
+export OLLAMA_BASE_URL="http://localhost:11434"
+export EMBED_MODEL="nomic-embed-text:latest"
 
-FORCE_REINDEX=0
-AUTO_INDEX_NO_GIT=0
-INDEX_MAX_FILES_BACKEND=4000
-INDEX_MAX_FILES_FRONTEND=4000
+export FORCE_REINDEX="0"
+export AUTO_INDEX_NO_GIT="0"
+export INDEX_MAX_FILES_BACKEND="4000"
+export INDEX_MAX_FILES_FRONTEND="4000"
 ```
 
 ---
 
-## Indexing Model (Continue-like)
+## Indexing Model (Continue‑like)
 
-Indexing is explicit and controlled.
+Indexing is **explicit and controlled**.
 
-### First-time Indexing
+### First‑time Indexing
 
-```
+```bash
 uv run python -m codeguardian.index
 ```
 
 ### Normal Execution
 
-```
-crewai run
+```bash
+uv run crewai run
 ```
 
-Re-indexing happens only if:
-- Git HEAD changed and relevant files were modified
-- Uncommitted relevant changes exist
-- Index configuration changed
-- FORCE_REINDEX=1
+Re‑indexing happens **only if**:
+
+* Git `HEAD` changed and relevant files were modified
+* Uncommitted relevant changes exist
+* Index configuration changed
+* `FORCE_REINDEX=1`
 
 ---
 
-## Git-Aware Change Detection
+## Git‑Aware Change Detection
 
-- git diff old..new
-- git status --porcelain
+* `git diff old..new`
+* `git status --porcelain`
 
-Only relevant file changes trigger re-indexing.
+Only **relevant file changes** trigger re‑indexing.
 
 ---
 
 ## Task & Context Flow
 
-1. Architect Task:
-    - Reads bug files and .gitignore
-    - Uses RAG search
-    - Outputs Change Plan
+1. **Architect Task**
 
-2. Engineer Task:
-    - Receives Change Plan via task.context
-    - Implements fix directly
+    * Reads bug files and `.gitignore`
+    * Uses local RAG search
+    * Outputs a structured **Change Plan**
 
-No intermediate files. No duplicated context.
+2. **Engineer Task**
+
+    * Receives Change Plan via `task.context`
+    * Applies fixes directly in the target repository
+
+No intermediate files.
+No duplicated context.
 
 ---
 
 ## Why No YAML?
 
-- Full control in Python
-- Static typing
-- Debuggable
-- No magic defaults
+* Full control in Python
+* Static typing
+* Debuggable
+* No magic defaults
+* No hidden CrewAI scaffold behavior
 
 ---
 
 ## Typical Workflow
 
-```
+```bash
+source .venv/Scripts/activate
 uv run python -m codeguardian.index
-crewai run
+uv run crewai run
 ```
+
+(or skip activation and just use `uv run`)
 
 ---
 
 ## Guarantees
 
-- No cloud calls
-- No OpenAI embeddings
-- No Qdrant
-- Fully local RAG
-- Deterministic behavior
-- Scales to large repos
+* No cloud calls
+* No OpenAI embeddings
+* No Qdrant
+* Fully local RAG
+* Deterministic behavior
+* Scales to large repositories
 
 ---
 
 ## Summary
 
-CodeGuardian behaves like a professional on-prem AI engineer:
-- indexes only when needed
-- respects git and .gitignore
-- scales cleanly
-- modifies code responsibly
+**CodeGuardian behaves like a professional on‑prem AI engineer:**
+
+* indexes only when needed
+* respects Git and `.gitignore`
+* scales cleanly
+* modifies code responsibly
