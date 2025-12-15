@@ -10,7 +10,7 @@ def build_senior_software_architect(llm: LLM, tools=None) -> Agent:
         allow_delegation=False,
         max_iter=18,
         max_retry_limit=2,
-        allow_code_execution=False,
+        allow_code_execution=True,
         tools=tools or [],
     )
 
@@ -24,6 +24,7 @@ def build_senior_software_engineer(llm: LLM, tools=None) -> Agent:
         allow_delegation=False,
         max_iter=25,
         max_retry_limit=2,
-        allow_code_execution=False,
+        allow_code_execution=True,
         tools=tools or [],
+
     )
