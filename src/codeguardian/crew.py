@@ -39,5 +39,6 @@ class Codeguardian:
             agents=[architect, engineer],
             tasks=[t1, t2],
             process=Process.sequential,
+            tracing=True,  # Enable built-in tracing
             verbose=True,
         )
