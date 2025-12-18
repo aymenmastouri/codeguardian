@@ -138,3 +138,28 @@ QA VERIFICATION REPORT
         expected_output="QA report confirming if the bug is fixed based on tests and requirements.",
         agent=agent,
     )
+
+def manager_review_task(agent: Agent, context_tasks: list) -> Task:
+    return Task(
+        description="""
+You are the Engineering Manager.
+
+1) Review the outputs from the DevOps Engineer (Build Report) and QA Engineer (Verification Report).
+2) DECISION LOGIC:
+   - IF (Build == FAILURE) OR (QA == FAILED):
+     a) Identify the specific errors (compilation, test failure, etc.).
+     b) DELEGATE a task to the "Senior Software Engineer (Implementation)" to FIX the code. Provide them with the error details.
+     c) DELEGATE a task to the "DevOps Engineer (Build & Integration)" to RE-RUN the build/tests.
+     d) Repeat this loop until Success or Max Retries (2).
+   - IF (Build == SUCCESS) AND (QA == VERIFIED):
+     a) Sign off on the release.
+
+Output:
+FINAL SIGN-OFF
+- Status: APPROVED / REJECTED
+- Summary of interventions (if any)
+""",
+        expected_output="Final sign-off or rejection after attempting recovery.",
+        agent=agent,
+        context=context_tasks
+    )

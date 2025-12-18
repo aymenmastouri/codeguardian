@@ -7,13 +7,15 @@ from .agents import (
     build_senior_software_architect, 
     build_senior_software_engineer,
     build_devops_engineer,
-    build_qa_engineer
+    build_qa_engineer,
+    build_engineering_manager
 )
 from .tasks import (
     analysis_and_design_task, 
     implementation_task,
     build_and_test_task,
-    functional_verification_task
+    functional_verification_task,
+    manager_review_task
 )
 from .tools.tools import (
     architect_tools, 
@@ -49,11 +51,13 @@ class Codeguardian:
         engineer = build_senior_software_engineer(llm, tools=engineer_tools())
         devops = build_devops_engineer(llm, tools=devops_tools())
         qa = build_qa_engineer(llm, tools=qa_tools())
+        manager = build_engineering_manager(llm, tools=[]) # Manager delegates, doesn't need direct tools usually, or maybe read tools
 
         t1 = analysis_and_design_task(architect)
         t2 = implementation_task(engineer)
         t3 = build_and_test_task(devops)
         t4 = functional_verification_task(qa)
+        t5 = manager_review_task(manager, context_tasks=[t3, t4])
 
         # Chain context
         t2.context = [t1]
@@ -61,8 +65,8 @@ class Codeguardian:
         t4.context = [t1, t3] # QA needs bug desc (from t1 context or file) and build status
 
         return Crew(
-            agents=[architect, engineer, devops, qa],
-            tasks=[t1, t2, t3, t4],
+            agents=[architect, engineer, devops, qa, manager],
+            tasks=[t1, t2, t3, t4, t5],
             process=Process.sequential,
             tracing=True,
             verbose=True,

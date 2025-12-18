@@ -56,3 +56,17 @@ def build_qa_engineer(llm: LLM, tools=None) -> Agent:
         allow_code_execution=False,
         tools=tools or [],
     )
+
+def build_engineering_manager(llm: LLM, tools=None) -> Agent:
+    return Agent(
+        role="Engineering Manager (Review & Recovery)",
+        goal="Oversee the pipeline. If Build or QA fails, coordinate a recovery plan by delegating fixes to the Engineer and re-testing to DevOps.",
+        backstory="Experienced Engineering Manager who ensures technical quality and resolves blockers by coordinating the team.",
+        llm=llm,
+        verbose=True,
+        allow_delegation=True, # CRITICAL: Allows delegating tasks back to other agents
+        max_iter=15,
+        max_retry_limit=2,
+        allow_code_execution=False,
+        tools=tools or [],
+    )
