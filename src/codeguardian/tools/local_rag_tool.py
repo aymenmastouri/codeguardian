@@ -208,13 +208,53 @@ class LocalDirectoryRagTool(BaseTool):
     # Internals
     # -------------------------
     def _embed_one(self, text: str) -> List[float]:
-        r = requests.post(
-            f"{self._ollama_base}/api/embeddings",
-            json={"model": self._embed_model, "prompt": text},
-            timeout=self._timeout_s,
-        )
-        r.raise_for_status()
-        return r.json()["embedding"]
+        # Use OpenAI-compatible endpoint for Ollama
+        # This matches how we configured CrewAI to talk to Ollama
+        url = f"{self._ollama_base}/v1/embeddings"
+        
+        # Try OpenAI format first
+        try:
+            r = requests.post(
+                url,
+                json={"model": self._embed_model, "input": text},
+                timeout=self._timeout_s,
+                headers={"Authorization": "Bearer NA"}
+            )
+            if r.status_code == 404:
+                # Fallback to native Ollama API if /v1/embeddings not found
+                url = f"{self._ollama_base}/api/embeddings"
+                r = requests.post(
+                    url,
+                    json={"model": self._embed_model, "prompt": text},
+                    timeout=self._timeout_s,
+                )
+            
+            r.raise_for_status()
+            data = r.json()
+            
+            # Handle OpenAI format response
+            if "data" in data and isinstance(data["data"], list):
+                return data["data"][0]["embedding"]
+            
+            # Handle native Ollama format response
+            if "embedding" in data:
+                return data["embedding"]
+                
+            raise ValueError(f"Unexpected response format from {url}")
+            
+        except Exception as e:
+            # Last resort fallback to native API if everything else failed
+            try:
+                url = f"{self._ollama_base}/api/embeddings"
+                r = requests.post(
+                    url,
+                    json={"model": self._embed_model, "prompt": text},
+                    timeout=self._timeout_s,
+                )
+                r.raise_for_status()
+                return r.json()["embedding"]
+            except Exception:
+                raise e
 
     def _iter_files(self) -> Iterable[Path]:
         for p in self._directory.rglob("*"):

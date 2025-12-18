@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import sys
+import logging
 import warnings
 from codeguardian.crew import Codeguardian
 
@@ -10,10 +12,21 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 # interpolate any tasks and agents information
 
 
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+
 def run():
     """
     Run the crew.
     """
+    setup_logging()
     crew = Codeguardian().crew()
     result = crew.kickoff()
     print(result)

@@ -9,6 +9,7 @@ from typing import Optional, List
 from crewai_tools import FileReadTool, FileWriterTool, DirectoryReadTool
 from codeguardian.tools.local_rag_tool import LocalDirectoryRagTool
 from codeguardian.tools.build_tools import BuildTool, UnitTestTool
+from codeguardian.config.settings import settings
 
 
 # -------------------------
@@ -16,32 +17,29 @@ from codeguardian.tools.build_tools import BuildTool, UnitTestTool
 # -------------------------
 def _project_dir() -> Path:
     # TARGET repository you want to analyze/change
-    return Path(os.getenv("PROJECT_PATH", r"C:\project-backend")).resolve()
+    return settings.project_path
 
 
 def _inputs_dir() -> Path:
-    return Path(os.getenv("INPUTS_PATH", r"C:\inputs")).resolve()
+    return settings.inputs_path
 
 
 def _chroma_dir() -> Path:
-    return Path(os.getenv("CHROMA_DIR", "./content/.chroma")).resolve()
+    return settings.chroma_dir
 
 
 def _index_meta_path() -> Path:
     # store last indexed git head + settings snapshot
-    return _chroma_dir() / "index.meta.json"
+    return settings.index_meta_path
 
 
 # -------------------------
 # BUG files
 # -------------------------
 def bug_files_tools():
-    inputs = _inputs_dir()
-    desc = os.getenv("BUG_DESC_FILE", "bug-desc.txt")
-    log = os.getenv("BUG_LOG_FILE", "bug-log.txt")
     return [
-        FileReadTool(file_path=str((inputs / desc).resolve())),
-        FileReadTool(file_path=str((inputs / log).resolve())),
+        FileReadTool(file_path=str(settings.bug_desc_path)),
+        FileReadTool(file_path=str(settings.bug_log_path)),
     ]
 
 
@@ -84,6 +82,8 @@ def directory_search_tool() -> LocalDirectoryRagTool:
     return LocalDirectoryRagTool(
         directory=str(_project_dir()),
         persist_directory=str(_chroma_dir()),
+        ollama_base_url=settings.ollama_base_url,
+        embed_model=settings.embed_model,
         **kwargs
     )
 
@@ -347,6 +347,12 @@ def ensure_repo_indexed(force: bool = False) -> str:
 # -------------------------
 # Agent toolsets
 # -------------------------
+def ba_tools():
+    return [
+        *bug_files_tools(),
+    ]
+
+
 def architect_tools():
     project = _project_dir()
     return [

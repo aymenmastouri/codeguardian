@@ -1,0 +1,20 @@
+Write a JAVA unit test class - thereby:
+
+Respect that we are using:
+- JAVA 17
+- SpringBoot 3.4.x
+- Hibernate Data Access
+- JUnit 5
+
+While writing tests
+- ensure we cover each public method
+- ensure we cover all branches within each method
+- ensure we cover all used private functions including there branches
+- ensure we cover multiple value input scenarios not forgetting edge cases (eg NULL, empty, MAX_LENGTH, -1)
+
+While writing tests      
+- ensure each tests has a good short and concise description using @DisplayName("<use tested methodName here> - <use description here so a read know what is tested herein in one simple sentence>")
+- ensure each test name is prefixed with "test", then method name, then keyword hints to test case all in camelCase
+- ensure you write rough comments in Gherkin style with uppercase GIVEN, WHEN, THEN aligned with the corresponding code implementation
+
+Ensure the test class is well-structured and follows JUnit testing best practices.

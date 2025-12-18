@@ -1,7 +1,7 @@
 # CodeGuardian
 
 **CodeGuardian** is a **code-first, on‑prem AI engineering crew** built with **CrewAI**.
-It analyzes bugs, searches large repositories efficiently using **local RAG**, and **implements fixes directly in the target project** — without relying on cloud services.
+It acts as an autonomous software engineering team that analyzes bugs, searches large repositories efficiently using **local RAG**, implements fixes, enforces testing standards, and verifies release readiness — all without relying on cloud services.
 
 The system is designed to scale to **large repositories (10k+ files)** and behaves similarly to the **Continue IDE plugin**:
 
@@ -14,31 +14,52 @@ The system is designed to scale to **large repositories (10k+ files)** and behav
 ## Key Principles
 
 * ✅ Fully on‑prem (LLM + embeddings)
-* ✅ Code‑first (no YAML configs)
+* ✅ Code‑first Agents & Tasks
 * ✅ Explicit & incremental indexing
 * ✅ Git‑aware change detection
-* ✅ Minimal context passed between agents
+* ✅ **Knowledge-Driven Development** (Enforces Testing Standards)
 * ✅ Deterministic behavior
 
 ---
 
-## Architecture Overview
+## Architecture Overview: "Quality-Gated Pipeline"
 
-### Agents
+The system implements a **Linear, Quality-Gated Autonomous Pipeline** where each role has strict validation responsibilities.
 
-**Senior Software Architect**
+### The Workflow
 
-* Reads bug description & logs
-* Respects `.gitignore` from the **target project**
-* Uses semantic RAG search (local)
-* Produces a structured **Change Plan**
+1.  **Phase 1: Analysis & Design**
+    *   **Senior Architect (Tech Lead):** Analyzes the bug report and codebase. Designs the solution and delegates the implementation plan. Owns technical quality.
+2.  **Phase 2: Implementation & Whitebox Testing**
+    *   **Senior Engineer:** Implements the fix in the target repository.
+    *   **Mandatory:** Updates/Fixes **Unit Tests** and **Integration Tests** (Whitebox).
+    *   **Self-Validation:** Must run the build and tests locally to ensure success before finishing.
+3.  **Phase 3: Build & Integration**
+    *   **DevOps Engineer:** Detects the build system (Gradle/Maven/NPM), runs the CI build, and executes the full test suite.
+    *   *Self-Correction:* Can autonomously fix simple compilation errors.
+4.  **Phase 4: Functional Verification & Release**
+    *   **QA Engineer:** Performs **Functional Testing** and verifies **Deployability**.
+    *   Ensures the application is release-ready and meets all Acceptance Criteria.
 
-**Senior Software Engineer**
+### Agent Roles
 
-* Consumes the Change Plan via task context
-* Locates exact files
-* Implements fixes **directly in the target repo**
-* Writes **minimal diffs only**
+| Agent | Role | Key Capabilities | Tools |
+| :--- | :--- | :--- | :--- |
+| **Senior Architect** | Technical Lead | Analysis, Design, Delegation, RAG search. | `FileReadTool`, `LocalDirectoryRagTool`, `DirectoryReadTool` |
+| **Senior Engineer** | Implementation | Code modification, **Unit/Integration Testing**, Self-Validation. | `FileReadTool`, `FileWriterTool`, `DirectoryReadTool`, `BuildTool`, `UnitTestTool` |
+| **DevOps Engineer** | Build & CI | Build system detection, **Self-Healing** (compilation fixes). | `BuildTool`, `UnitTestTool`, `FileWriterTool` |
+| **QA Engineer** | Release Verification | **Functional Testing**, Deployability Check, Release Sign-off. | `UnitTestTool`, `FileReadTool` |
+
+---
+
+## Knowledge Base (Testing Standards)
+
+CodeGuardian enforces strict testing standards via its **Knowledge Base**. Agents are instructed to consult these files before writing code or tests.
+
+*   `knowledge/be-test-junit.txt`: Standards for Java/SpringBoot/JUnit 5 tests (Gherkin style, coverage rules).
+*   `knowledge/fe-test-jasmine.txt`: Standards for Angular/Jasmine tests.
+
+The Knowledge Base is indexed using **Ollama** embeddings (`nomic-embed-text`) for efficient retrieval.
 
 ---
 
@@ -47,188 +68,73 @@ The system is designed to scale to **large repositories (10k+ files)** and behav
 ```
 codeguardian/
 ├─ src/codeguardian/
-│  ├─ agents.py
-│  ├─ tasks.py
-│  ├─ crew.py
-│  ├─ index.py              # explicit indexing command
+│  ├─ agents.py             # 4 Agents (Arch, Eng, DevOps, QA)
+│  ├─ tasks.py              # Task definitions & logic
+│  ├─ crew.py               # Orchestration & Knowledge Loading
+│  ├─ index.py              # Explicit indexing command
+│  ├─ config/
+│  │  ├─ settings.py        # Pydantic Configuration
+│  │  └─ rag_config.yaml    # RAG file patterns
 │  └─ tools/
-│     ├─ tools.py           # tool wiring & index logic
-│     └─ local_rag_tool.py  # Ollama + Chroma RAG tool
-├─ content/.chroma/         # persistent vector index
+│     ├─ tools.py           # Tool wiring
+│     ├─ local_rag_tool.py  # Ollama + Chroma RAG
+│     └─ build_tools.py     # Gradle/Maven/NPM wrappers
+├─ knowledge/               # Text-based testing standards
+├─ content/.chroma/         # Persistent vector index
 ├─ pyproject.toml
 └─ README.md
 ```
 
 ---
 
-## Target Project vs CodeGuardian Repo
+## Configuration
 
-| Purpose                       | Path           |
-| ----------------------------- | -------------- |
-| CodeGuardian repo             | anywhere       |
-| Target project to analyze/fix | `PROJECT_PATH` |
-| Bug input files               | `INPUTS_PATH`  |
-| Vector index                  | `CHROMA_DIR`   |
+Configuration is managed via `.env` and `src/codeguardian/config/settings.py`.
 
-> `.gitignore` is **always read from the target project**, never from CodeGuardian.
+### Environment Variables (`.env`)
+
+```ini
+# Target Project
+PROJECT_PATH=C:/path/to/your/target/repo
+INPUTS_PATH=C:/path/to/bug/reports
+
+# LLM Configuration (OpenAI Compatible)
+OPENAI_API_BASE=http://localhost:1234/v1
+OPENAI_API_KEY=lm-studio
+OPENAI_MODEL_NAME=qwen2.5-coder-32b-instruct
+
+# Embeddings (Ollama)
+EMBED_MODEL=nomic-embed-text
+```
 
 ---
 
 ## Requirements
 
 * Python **3.10+**
-* **uv**
+* **uv** (Python package manager)
 * Git
-* **Ollama** (for embeddings)
-* On‑prem **OpenAI‑compatible LLM endpoint**
+* **Ollama** (for embeddings: `ollama pull nomic-embed-text`)
+* On‑prem **OpenAI‑compatible LLM endpoint** (e.g., LM Studio, Ollama)
 
 ---
 
-## Installation
+## How to Run
 
-```bash
-uv sync
-```
+1.  **Install Dependencies**:
+    ```powershell
+    uv sync
+    ```
 
-This creates a local `.venv` automatically.
+2.  **Configure Environment**:
+    Copy `.env.template` to `.env` and set your paths and LLM details.
 
----
+3.  **Prepare Bug Report**:
+    Place `bug-desc.txt` and `bug-log.txt` in your `INPUTS_PATH`.
 
-## Virtual Environment (Windows + Git Bash)
+4.  **Run CodeGuardian**:
+    ```powershell
+    uv run codeguardian
+    ```
 
-### Activate `.venv`
-
-```bash
-source .venv/Scripts/activate
-```
-
-You should see:
-
-```
-(.venv) username@machine
-```
-
-### Deactivate
-
-```bash
-deactivate
-```
-
-> **Recommended:** even with `.venv`, prefer `uv run` for deterministic execution.
-
----
-
-## Environment Variables
-
-```bash
-export PROJECT_PATH="/c/project-backend"
-export INPUTS_PATH="/c/inputs"
-export BUG_DESC_FILE="bug-desc.txt"
-export BUG_LOG_FILE="bug-log.txt"
-
-export CHROMA_DIR="/c/projects/codeguardian/.cache/.chroma"
-
-export OLLAMA_BASE_URL="http://localhost:11434"
-export EMBED_MODEL="nomic-embed-text:latest"
-
-export FORCE_REINDEX="0"
-export AUTO_INDEX_NO_GIT="0"
-export INDEX_MAX_FILES_BACKEND="4000"
-export INDEX_MAX_FILES_FRONTEND="4000"
-```
-
----
-
-## Indexing Model (Continue‑like)
-
-Indexing is **explicit and controlled**.
-
-### First‑time Indexing
-
-```bash
-uv run python -m codeguardian.index
-```
-
-### Normal Execution
-
-```bash
-uv run crewai run
-```
-
-Re‑indexing happens **only if**:
-
-* Git `HEAD` changed and relevant files were modified
-* Uncommitted relevant changes exist
-* Index configuration changed
-* `FORCE_REINDEX=1`
-
----
-
-## Git‑Aware Change Detection
-
-* `git diff old..new`
-* `git status --porcelain`
-
-Only **relevant file changes** trigger re‑indexing.
-
----
-
-## Task & Context Flow
-
-1. **Architect Task**
-
-    * Reads bug files and `.gitignore`
-    * Uses local RAG search
-    * Outputs a structured **Change Plan**
-
-2. **Engineer Task**
-
-    * Receives Change Plan via `task.context`
-    * Applies fixes directly in the target repository
-
-No intermediate files.
-No duplicated context.
-
----
-
-## Why No YAML?
-
-* Full control in Python
-* Static typing
-* Debuggable
-* No magic defaults
-* No hidden CrewAI scaffold behavior
-
----
-
-## Typical Workflow
-
-```bash
-source .venv/Scripts/activate
-uv run python -m codeguardian.index
-uv run crewai run
-```
-
-(or skip activation and just use `uv run`)
-
----
-
-## Guarantees
-
-* No cloud calls
-* No OpenAI embeddings
-* No Qdrant
-* Fully local RAG
-* Deterministic behavior
-* Scales to large repositories
-
----
-
-## Summary
-
-**CodeGuardian behaves like a professional on‑prem AI engineer:**
-
-* indexes only when needed
-* respects Git and `.gitignore`
-* scales cleanly
-* modifies code responsibly
+This will start the crew, index the repository (if needed), and execute the pipeline.

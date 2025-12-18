@@ -18,6 +18,7 @@ MANDATORY ORDER:
 
 Deliver:
 - CHANGE PLAN (human readable)
+- ROOT CAUSE ANALYSIS (RCA) - If this is a bug, explain WHY it happened.
 - PATCH PLAN JSON (between markers)
 
 PATCH PLAN JSON RULES (MANDATORY):
@@ -38,6 +39,8 @@ PATCH PLAN JSON RULES (MANDATORY):
 Rules:
 - Do NOT implement anything
 - Do NOT write files
+- Check for initialization of fields to avoid NullPointerException.
+- Check for incorrect or unused imports.
 """,
         expected_output="Change plan + Patch plan JSON with exact target files and precise instructions.",
         agent=agent,
@@ -62,6 +65,22 @@ MANDATORY FILE SELECTION (STRICT):
   1) Build absolute path = PROJECT_PATH + "/" + target_files[].path
   2) Read THAT file using FileReadTool
   3) Implement the listed changes in THAT file using FileWriterTool (minimal diff)
+
+EXTERNAL GUIDELINES (MANDATORY):
+- You MUST query your Knowledge Base for "Testing Guidelines" or "Unit Test Standards" before writing any code.
+- Adhere strictly to the patterns found in the Knowledge Base (e.g., JUnit 5, Gherkin style, naming conventions).
+
+TESTING & VERIFICATION (MANDATORY):
+- You are responsible for creating/updating a COMPREHENSIVE test suite.
+- 1. UNIT TESTS (REQUIRED): Cover all new/modified logic with high branch coverage.
+- 2. INTEGRATION TESTS (REQUIRED): Ensure the component interacts correctly with its dependencies (Whitebox).
+- 3. E2E TESTS (OPTIONAL): If this is a user-facing feature/bug, add a high-level test case.
+- If existing tests are weak, refactor them to match the Knowledge Base standards.
+
+SELF-VALIDATION (MANDATORY):
+- BEFORE finishing, you MUST run the build and tests using BuildTool and UnitTestTool.
+- If they fail, FIX THEM immediately. Do not hand off broken code.
+
 - DO NOT use local_directory_rag_search to find target files from the plan.
 
 WHEN RAG IS ALLOWED:
@@ -76,6 +95,7 @@ OTHER RULES:
 - Only modify files under PROJECT_PATH.
 - Backward compatible changes only.
 - Add/adjust tests only if required by acceptance criteria.
+- Verify imports: Remove unused imports, ensure correct classes are imported.
 
 Output:
 IMPLEMENTATION SUMMARY
@@ -122,44 +142,30 @@ def functional_verification_task(agent: Agent) -> Task:
         description="""
 You are the QA Engineer.
 
-1) Read the "Steps to Reproduce" and "Expected Result" from the bug description (provided in context or read bug-desc.txt).
-2) Verify the fix.
-   - Since you are in a headless environment, you cannot open a browser.
-   - Use UnitTestTool to run the full test suite as a proxy for functional verification.
-   - OR if there are specific reproduction scripts (e.g. curl commands) mentioned in the bug description, try to simulate them (conceptually or via tools if available).
-3) Compare Actual Result vs Expected Result.
+1) Read the "Steps to Reproduce" and "Expected Result" from the bug description.
+2) FUNCTIONAL TESTING:
+   - Verify the fix works from a user perspective.
+   - WRITE or EXTEND functional tests (e.g., Jasmine/Selenium/Cypress concepts) if missing.
+   - Consult the Knowledge Base for "Testing Guidelines".
+3) DEPLOYABILITY CHECK:
+   - Ensure the application is ready for deployment.
+   - Verify no critical regressions.
+4) EXECUTE VERIFICATION:
+   - Use UnitTestTool to run the full test suite.
+   - If tests are missing or insufficient, REJECT the build and ask for more tests.
+5) Compare Actual Result vs Expected Result.
+6) VERIFY ACCEPTANCE CRITERIA (ACs):
+   - Ensure all ACs defined in the ticket/bug description are met.
 
 Output:
 QA VERIFICATION REPORT
-- Status: VERIFIED / FAILED
+- Status: RELEASE READY / REJECTED
+- Functional Test Coverage
+- Acceptance Criteria Verification (Pass/Fail for each AC)
 - Evidence (logs, test outputs)
-- Final Recommendation (Release / Reject)
 """,
-        expected_output="QA report confirming if the bug is fixed based on tests and requirements.",
+        expected_output="QA report confirming functional quality and release readiness.",
         agent=agent,
     )
 
-def manager_review_task(agent: Agent, context_tasks: list) -> Task:
-    return Task(
-        description="""
-You are the Engineering Manager.
 
-1) Review the outputs from the DevOps Engineer (Build Report) and QA Engineer (Verification Report).
-2) DECISION LOGIC:
-   - IF (Build == FAILURE) OR (QA == FAILED):
-     a) Identify the specific errors (compilation, test failure, etc.).
-     b) DELEGATE a task to the "Senior Software Engineer (Implementation)" to FIX the code. Provide them with the error details.
-     c) DELEGATE a task to the "DevOps Engineer (Build & Integration)" to RE-RUN the build/tests.
-     d) Repeat this loop until Success or Max Retries (2).
-   - IF (Build == SUCCESS) AND (QA == VERIFIED):
-     a) Sign off on the release.
-
-Output:
-FINAL SIGN-OFF
-- Status: APPROVED / REJECTED
-- Summary of interventions (if any)
-""",
-        expected_output="Final sign-off or rejection after attempting recovery.",
-        agent=agent,
-        context=context_tasks
-    )

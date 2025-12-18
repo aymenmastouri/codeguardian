@@ -1,0 +1,16 @@
+Write a Jasmine unit test class for the following Angular TypeScript code
+
+The test class should include multiple `describe` blocks:
+- One for the tested class itself
+  - within class test one for "code tests"
+    - within "code tests" one for each tested function
+  - within class tests one for "ui element related tests"
+
+While writing tests
+- ensure we cover all branches
+- ensure we cover edge classes
+
+While writing tests
+- ensure you write rough comments in Gherkin style with uppercase GIVEN, WHEN, THEN aligned with the corresponding code implementation
+
+Ensure the test class is well-structured and follows Angular testing best practices.
