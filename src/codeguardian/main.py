@@ -3,6 +3,7 @@ import sys
 import logging
 import warnings
 from codeguardian.crew import Codeguardian
+from codeguardian.config.settings import settings
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
@@ -27,6 +28,7 @@ def run():
     Run the crew.
     """
     setup_logging()
+    print(f"DEBUG: Chroma Dir: {settings.chroma_dir.resolve()}")
     crew = Codeguardian().crew()
     result = crew.kickoff()
     print(result)

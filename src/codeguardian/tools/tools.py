@@ -6,7 +6,7 @@ from pathlib import Path
 from functools import lru_cache
 from typing import Optional, List
 
-from crewai_tools import FileReadTool, FileWriterTool, DirectoryReadTool
+from crewai_tools import FileReadTool, FileWriterTool
 from codeguardian.tools.local_rag_tool import LocalDirectoryRagTool
 from codeguardian.tools.build_tools import BuildTool, UnitTestTool
 from codeguardian.config.settings import settings
@@ -359,7 +359,6 @@ def architect_tools():
         FileReadTool(file_path=str((project / ".gitignore").resolve())),  # from TARGET repo
         *bug_files_tools(),
         directory_search_tool(),
-        DirectoryReadTool(directory=str(project)),
     ]
 
 
@@ -370,7 +369,8 @@ def engineer_tools():
         *bug_files_tools(),
         directory_search_tool(),
         FileWriterTool(),
-        DirectoryReadTool(directory=str(project)),
+        BuildTool(),
+        UnitTestTool(),
     ]
 
 def devops_tools():
@@ -379,8 +379,6 @@ def devops_tools():
         FileReadTool(file_path=str((project / ".gitignore").resolve())),
         BuildTool(),
         UnitTestTool(),
-        FileWriterTool(), # Allowed to fix build errors
-        DirectoryReadTool(directory=str(project)),
     ]
 
 def qa_tools():
@@ -395,5 +393,4 @@ def qa_tools():
         # But the user asked for "functional test".
         # Let's give them the ability to run the build/test suite as a proxy for functional tests if no external env is set up.
         UnitTestTool(), 
-        DirectoryReadTool(directory=str(project)),
     ]

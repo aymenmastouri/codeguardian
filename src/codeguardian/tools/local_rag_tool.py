@@ -89,8 +89,18 @@ class LocalDirectoryRagTool(BaseTool):
             "__pycache__", ".pytest_cache"
         }
 
-        self._client = chromadb.PersistentClient(path=self._persist_directory)
-        self._collection = self._client.get_or_create_collection(self._collection_name)
+        # Initialize ChromaDB with error recovery
+        try:
+            self._client = chromadb.PersistentClient(path=self._persist_directory)
+            self._collection = self._client.get_or_create_collection(self._collection_name)
+        except Exception as e:
+            # If ChromaDB fails (e.g., corrupted index), delete and recreate
+            import shutil
+            print(f"Warning: ChromaDB error, resetting index: {e}")
+            if Path(self._persist_directory).exists():
+                shutil.rmtree(self._persist_directory)
+            self._client = chromadb.PersistentClient(path=self._persist_directory)
+            self._collection = self._client.get_or_create_collection(self._collection_name)
 
     def reset(self) -> None:
         """Wipes the collection to start fresh (e.g. when switching projects)."""
