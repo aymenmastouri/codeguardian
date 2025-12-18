@@ -1,0 +1,64 @@
+global:
+  extensions:
+    - ".java"
+    - ".xml"
+    - ".properties"
+    - ".yml"
+    - ".yaml"
+    - ".sql"
+    - ".md"
+    - ".ts"
+    - ".tsx"
+    - ".html"
+    - ".scss"
+    - ".css"
+    - ".json"
+    - ".gradle"
+    - ".toml"
+    - ".txt"
+    - ".py"
+  exclude_dirs:
+    - ".git"
+    - ".venv"
+    - "node_modules"
+    - "dist"
+    - "build"
+    - "target"
+    - ".idea"
+    - "__pycache__"
+    - ".pytest_cache"
+
+backend:
+  include:
+    - "src/main/java/**"
+
+    - "src/test/java/**"
+    - "src/main/resources/**"
+    - "**/pom.xml"
+    - "**/*.gradle"
+    - "**/*.properties"
+    - "**/*.yml"
+    - "**/*.yaml"
+    - "**/*.xml"
+    - "**/*.sql"
+  exclude:
+    - "**/target/**"
+    - "**/build/**"
+
+frontend:
+  include:
+    - "src/**"
+    - "projects/**"
+    - "angular.json"
+    - "package.json"
+    - "tsconfig*.json"
+    - "**/*.ts"
+    - "**/*.html"
+    - "**/*.scss"
+    - "**/*.css"
+    - "**/*.md"
+  exclude:
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/.angular/**"
+    - "**/.cache/**"

@@ -86,3 +86,55 @@ IMPLEMENTATION SUMMARY
         expected_output="Implementation summary with changed files and verification steps.",
         agent=agent,
     )
+
+def build_and_test_task(agent: Agent) -> Task:
+    return Task(
+        description="""
+You are the DevOps Engineer.
+
+1) Detect the build system (Gradle, Maven, NPM) using BuildTool (auto-detect).
+2) Run the build command using BuildTool.
+3) If the build FAILS:
+   - Analyze the error log.
+   - If it is a simple compilation error (e.g., missing import, syntax error, typo) caused by the recent changes:
+     - Read the broken file.
+     - FIX IT using FileWriterTool.
+     - Rerun the build.
+   - If it is a complex error or dependency issue you cannot fix:
+     - Report the failure details.
+4) If the build SUCCEEDS:
+   - Run unit tests using UnitTestTool.
+   - If tests fail, report the failure.
+
+Output:
+BUILD REPORT
+- Status: SUCCESS / FAILURE
+- Build Logs (snippet)
+- Test Results
+- Fixes Applied (if any)
+""",
+        expected_output="Build report indicating success or failure, with details of any fixes applied.",
+        agent=agent,
+    )
+
+def functional_verification_task(agent: Agent) -> Task:
+    return Task(
+        description="""
+You are the QA Engineer.
+
+1) Read the "Steps to Reproduce" and "Expected Result" from the bug description (provided in context or read bug-desc.txt).
+2) Verify the fix.
+   - Since you are in a headless environment, you cannot open a browser.
+   - Use UnitTestTool to run the full test suite as a proxy for functional verification.
+   - OR if there are specific reproduction scripts (e.g. curl commands) mentioned in the bug description, try to simulate them (conceptually or via tools if available).
+3) Compare Actual Result vs Expected Result.
+
+Output:
+QA VERIFICATION REPORT
+- Status: VERIFIED / FAILED
+- Evidence (logs, test outputs)
+- Final Recommendation (Release / Reject)
+""",
+        expected_output="QA report confirming if the bug is fixed based on tests and requirements.",
+        agent=agent,
+    )

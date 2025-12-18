@@ -92,6 +92,14 @@ class LocalDirectoryRagTool(BaseTool):
         self._client = chromadb.PersistentClient(path=self._persist_directory)
         self._collection = self._client.get_or_create_collection(self._collection_name)
 
+    def reset(self) -> None:
+        """Wipes the collection to start fresh (e.g. when switching projects)."""
+        try:
+            self._client.delete_collection(self._collection_name)
+        except Exception:
+            pass
+        self._collection = self._client.get_or_create_collection(self._collection_name)
+
     # -------------------------
     # CrewAI entrypoint
     # -------------------------

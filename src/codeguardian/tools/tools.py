@@ -1,12 +1,14 @@
 import os
 import json
+import yaml
 import subprocess
 from pathlib import Path
 from functools import lru_cache
 from typing import Optional, List
 
-from crewai_tools import FileReadTool, FileWriterTool
+from crewai_tools import FileReadTool, FileWriterTool, DirectoryReadTool
 from codeguardian.tools.local_rag_tool import LocalDirectoryRagTool
+from codeguardian.tools.build_tools import BuildTool, UnitTestTool
 
 
 # -------------------------
@@ -44,56 +46,67 @@ def bug_files_tools():
 
 
 # -------------------------
+# Config
+# -------------------------
+def _rag_config_path() -> Path:
+    return Path(__file__).parent.parent / "config" / "rag_config.yaml"
+
+
+@lru_cache(maxsize=1)
+def _load_rag_config() -> dict:
+    path = _rag_config_path()
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+# -------------------------
 # RAG tool (cached per process)
 # -------------------------
 @lru_cache(maxsize=1)
 def directory_search_tool() -> LocalDirectoryRagTool:
     # IMPORTANT: no indexing side effects here
+    cfg = _load_rag_config()
+    kwargs = {}
+    
+    exts = cfg.get("global", {}).get("extensions")
+    if exts:
+        kwargs["exts"] = set(exts)
+        
+    exclude_dirs = cfg.get("global", {}).get("exclude_dirs")
+    if exclude_dirs:
+        kwargs["exclude_dirs"] = set(exclude_dirs)
+
     return LocalDirectoryRagTool(
         directory=str(_project_dir()),
         persist_directory=str(_chroma_dir()),
+        **kwargs
     )
 
 
 # -------------------------
 # Index configuration (globs)
 # -------------------------
+
+
 def _backend_include_globs() -> List[str]:
-    return [
-        "src/main/java/**",
-        "src/test/java/**",
-        "src/main/resources/**",
-        "**/pom.xml",
-        "**/*.gradle",
-        "**/*.properties",
-        "**/*.yml",
-        "**/*.yaml",
-        "**/*.xml",
-        "**/*.sql",
-    ]
+    return _load_rag_config().get("backend", {}).get("include", [])
 
 
 def _backend_exclude_globs() -> List[str]:
-    return ["**/target/**", "**/build/**"]
+    return _load_rag_config().get("backend", {}).get("exclude", [])
 
 
 def _frontend_include_globs() -> List[str]:
-    return [
-        "src/**",
-        "projects/**",
-        "angular.json",
-        "package.json",
-        "tsconfig*.json",
-        "**/*.ts",
-        "**/*.html",
-        "**/*.scss",
-        "**/*.css",
-        "**/*.md",
-    ]
+    return _load_rag_config().get("frontend", {}).get("include", [])
 
 
 def _frontend_exclude_globs() -> List[str]:
-    return ["**/node_modules/**", "**/dist/**", "**/.angular/**", "**/.cache/**"]
+    return _load_rag_config().get("frontend", {}).get("exclude", [])
 
 
 def _index_settings_snapshot() -> dict:
@@ -267,6 +280,8 @@ def ensure_repo_indexed(force: bool = False) -> str:
     # No meta => first time
     if meta is None:
         tool = directory_search_tool()
+        # Ensure we start with a clean collection (in case .chroma exists but meta was deleted)
+        tool.reset()
         _index_backend(tool)
         _index_frontend(tool)
         _write_meta(head)
@@ -277,6 +292,11 @@ def ensure_repo_indexed(force: bool = False) -> str:
     cur_settings = _index_settings_snapshot()
     if not force and prev_settings != cur_settings:
         tool = directory_search_tool()
+        
+        # If project_dir changed, wipe the collection to avoid stale results from other projects
+        if prev_settings.get("project_dir") != cur_settings.get("project_dir"):
+            tool.reset()
+
         _index_backend(tool)
         _index_frontend(tool)
         _write_meta(head)
@@ -333,6 +353,7 @@ def architect_tools():
         FileReadTool(file_path=str((project / ".gitignore").resolve())),  # from TARGET repo
         *bug_files_tools(),
         directory_search_tool(),
+        DirectoryReadTool(directory=str(project)),
     ]
 
 
@@ -343,4 +364,30 @@ def engineer_tools():
         *bug_files_tools(),
         directory_search_tool(),
         FileWriterTool(),
+        DirectoryReadTool(directory=str(project)),
+    ]
+
+def devops_tools():
+    project = _project_dir()
+    return [
+        FileReadTool(file_path=str((project / ".gitignore").resolve())),
+        BuildTool(),
+        UnitTestTool(),
+        FileWriterTool(), # Allowed to fix build errors
+        DirectoryReadTool(directory=str(project)),
+    ]
+
+def qa_tools():
+    project = _project_dir()
+    return [
+        FileReadTool(file_path=str((project / ".gitignore").resolve())),
+        *bug_files_tools(),
+        # QA can run scripts or curl commands to verify
+        # For now, we give them BuildTool to run the app if needed, or we can add a specific RunAppTool
+        # Let's assume they use python scripts or curl via a command line tool if we had one.
+        # For safety, we'll stick to reading logs and maybe running a verification script if provided.
+        # But the user asked for "functional test".
+        # Let's give them the ability to run the build/test suite as a proxy for functional tests if no external env is set up.
+        UnitTestTool(), 
+        DirectoryReadTool(directory=str(project)),
     ]
